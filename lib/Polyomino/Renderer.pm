@@ -29,34 +29,34 @@ C<$m> defaults to C<$n> for square grids.
 =cut
 
 sub render {
-    my ($solution, $n, $m) = @_;
+    my ( $solution, $n, $m ) = @_;
     $m //= $n;
 
     my @grid;
-    for my $r (0 .. $n-1) {
-        for my $c (0 .. $m-1) {
+    for my $r ( 0 .. $n - 1 ) {
+        for my $c ( 0 .. $m - 1 ) {
             $grid[$r][$c] = '?';
         }
     }
 
     my $num_pieces = scalar @$solution;
-    my $width      = length("$num_pieces");   # 1 for ≤9, 2 for ≤99, 3 for ≤999, ...
+    my $width = length("$num_pieces");    # 1 for ≤9, 2 for ≤99, 3 for ≤999, ...
 
     my $piece_num = 0;
     for my $piece (@$solution) {
-        my $label = $piece_num + 1;           # 1-indexed so label width matches $width
+        my $label = $piece_num + 1;    # 1-indexed so label width matches $width
         for my $cell (@$piece) {
-            $grid[$cell->[0]][$cell->[1]] = $label;
+            $grid[ $cell->[0] ][ $cell->[1] ] = $label;
         }
         $piece_num++;
     }
 
-    my $hbar = '+' . (('-' x ($width + 2) . '+') x $m) . "\n";
+    my $hbar = '+' . ( ( '-' x ( $width + 2 ) . '+' ) x $m ) . "\n";
 
     my $out = $hbar;
-    for my $r (0 .. $n-1) {
+    for my $r ( 0 .. $n - 1 ) {
         $out .= '|';
-        for my $c (0 .. $m-1) {
+        for my $c ( 0 .. $m - 1 ) {
             $out .= sprintf " %*s |", $width, $grid[$r][$c];
         }
         $out .= "\n$hbar";
@@ -71,14 +71,14 @@ Render all solutions, each prefixed with a "Solution N:" header.
 =cut
 
 sub render_all {
-    my ($solutions, $n, $m) = @_;
+    my ( $solutions, $n, $m ) = @_;
     $m //= $n;
     my $out = '';
     my $i   = 0;
     for my $sol (@$solutions) {
         $i++;
         $out .= "Solution $i:\n";
-        $out .= render($sol, $n, $m);
+        $out .= render( $sol, $n, $m );
         $out .= "\n";
     }
     return $out;

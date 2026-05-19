@@ -61,10 +61,10 @@ Dies with an informative message on invalid input.
 =cut
 
 sub new {
-    my ($class, %args) = @_;
+    my ( $class, %args ) = @_;
 
     my $n = $args{n} // die "n is required\n";
-    my $m = $args{m} // $n;   # default to square if m omitted
+    my $m = $args{m} // $n;                     # default to square if m omitted
 
     die "n must be a positive integer\n" unless $n =~ /^\d+$/ && $n >= 1;
     die "m must be a positive integer\n" unless $m =~ /^\d+$/ && $m >= 1;
@@ -72,30 +72,29 @@ sub new {
     my $area = $n * $m;
     my @pieces;
 
-    if (exists $args{k}) {
+    if ( exists $args{k} ) {
         my $k = $args{k};
         die "k must be a positive integer\n" unless $k =~ /^\d+$/ && $k >= 1;
-        die "k ($k) cannot exceed n*m ($area)\n"    if $k > $area;
-        die "k ($k) must divide n*m ($area)\n"      if $area % $k != 0;
-        @pieces = ($k) x ($area / $k);
+        die "k ($k) cannot exceed n*m ($area)\n" if $k > $area;
+        die "k ($k) must divide n*m ($area)\n"   if $area % $k != 0;
+        @pieces = ($k) x ( $area / $k );
     }
-    elsif (exists $args{pieces}) {
+    elsif ( exists $args{pieces} ) {
         @pieces = @{ $args{pieces} };
         die "pieces must be a non-empty arrayref\n" unless @pieces;
         for my $k (@pieces) {
             die "each piece size must be a positive integer\n"
-                unless $k =~ /^\d+$/ && $k >= 1;
+              unless $k =~ /^\d+$/ && $k >= 1;
             die "piece size $k cannot exceed n*m ($area)\n" if $k > $area;
         }
         my $total = 0;
         $total += $_ for @pieces;
-        if ($total != $area) {
-            my $diff = $area - $total;
-            my $suggestion = _suggest_fill(\@pieces, $area);
-            die sprintf(
-                "piece sizes sum to %d but n*m = %d (off by %+d).\n%s\n",
-                $total, $area, $diff, $suggestion
-            );
+        if ( $total != $area ) {
+            my $diff       = $area - $total;
+            my $suggestion = _suggest_fill( \@pieces, $area );
+            die
+              sprintf( "piece sizes sum to %d but n*m = %d (off by %+d).\n%s\n",
+                $total, $area, $diff, $suggestion );
         }
     }
     else {
@@ -108,32 +107,38 @@ sub new {
 
 # Build a human-readable suggestion string when the pieces don't sum to area.
 sub _suggest_fill {
-    my ($pieces, $area) = @_;
+    my ( $pieces, $area ) = @_;
     my $total = 0;
     $total += $_ for @$pieces;
     my $diff = $area - $total;
 
     my @suggestions;
 
-    if ($diff > 0) {
+    if ( $diff > 0 ) {
         push @suggestions, "The grid has $diff unfilled cells.";
+
         # Suggest fill sizes that divide the remainder
-        my @divs = grep { $diff % $_ == 0 } (1 .. $diff);
+        my @divs = grep { $diff % $_ == 0 } ( 1 .. $diff );
         if (@divs) {
             my @opts;
             for my $d (@divs) {
                 my $count = $diff / $d;
                 push @opts, "$count piece(s) of size $d";
             }
-            push @suggestions, "To fill exactly, add one of: " . join('; or ', @opts) . ".";
+            push @suggestions,
+              "To fill exactly, add one of: " . join( '; or ', @opts ) . ".";
         }
     }
-    elsif ($diff < 0) {
-        push @suggestions, "The pieces overflow the grid by " . abs($diff) . " cells.";
-        push @suggestions, "Remove pieces totalling " . abs($diff) . " cells, or use a larger grid.";
+    elsif ( $diff < 0 ) {
+        push @suggestions,
+          "The pieces overflow the grid by " . abs($diff) . " cells.";
+        push @suggestions,
+            "Remove pieces totalling "
+          . abs($diff)
+          . " cells, or use a larger grid.";
     }
 
-    return join("\n", @suggestions);
+    return join( "\n", @suggestions );
 }
 
 =head2 suggest_pieces(n => $n, m => $m, must => \@sizes, fill => $fill_k)
@@ -147,28 +152,31 @@ Dies if the remainder is not divisible by C<fill>, with alternatives suggested.
 =cut
 
 sub suggest_pieces {
-    my ($class, %args) = @_;
+    my ( $class, %args ) = @_;
     my $n    = $args{n}    // die "n is required\n";
     my $m    = $args{m}    // $n;
     my $must = $args{must} // [];
     my $fill = $args{fill} // die "fill is required\n";
 
-    die "fill must be a positive integer\n" unless $fill =~ /^\d+$/ && $fill >= 1;
+    die "fill must be a positive integer\n"
+      unless $fill =~ /^\d+$/ && $fill >= 1;
 
     my $area  = $n * $m;
     my $taken = 0;
     $taken += $_ for @$must;
 
     my $remainder = $area - $taken;
-    if ($remainder < 0) {
-        die "The 'must' pieces already exceed the grid area ($taken > $area).\n";
+    if ( $remainder < 0 ) {
+        die
+          "The 'must' pieces already exceed the grid area ($taken > $area).\n";
     }
-    if ($remainder % $fill != 0) {
-        my $suggestion = _suggest_fill($must, $area);
-        die "Remainder ($remainder cells) is not divisible by fill size $fill.\n$suggestion\n";
+    if ( $remainder % $fill != 0 ) {
+        my $suggestion = _suggest_fill( $must, $area );
+        die
+"Remainder ($remainder cells) is not divisible by fill size $fill.\n$suggestion\n";
     }
 
-    my @result = (@$must, ($fill) x ($remainder / $fill));
+    my @result = ( @$must, ($fill) x ( $remainder / $fill ) );
     return \@result;
 }
 
@@ -211,11 +219,12 @@ is not vastly larger than C<$n>. For large grids, prefer C<solve_random()>.
 =cut
 
 sub solve_n {
-    my ($self, $n) = @_;
-    die "solve_n requires a positive integer\n" unless defined $n && $n =~ /^\d+$/ && $n >= 1;
+    my ( $self, $n ) = @_;
+    die "solve_n requires a positive integer\n"
+      unless defined $n && $n =~ /^\d+$/ && $n >= 1;
     my $placements = $self->_all_placements();
-    my @all = $self->_run_dlx($placements);
-    return @all > $n ? @all[0 .. $n-1] : @all;
+    my @all        = $self->_run_dlx($placements);
+    return @all > $n ? @all[ 0 .. $n - 1 ] : @all;
 }
 
 =head2 solve_random()
@@ -228,8 +237,8 @@ stops as soon as it finds one solution.
 =cut
 
 sub solve_random {
-    my ($self) = @_;
-    my $placements = $self->_all_placements(shuffle => 1);
+    my ($self)     = @_;
+    my $placements = $self->_all_placements( shuffle => 1 );
     my @solutions  = $self->_run_dlx($placements);
     return @solutions ? $solutions[0] : undef;
 }
@@ -245,8 +254,9 @@ Results are memoized across calls.
 
 {
     my %_cache;
+
     sub free_polyominoes_of {
-        my ($self_or_class, $k) = @_;
+        my ( $self_or_class, $k ) = @_;
         $_cache{$k} //= _generate_polyominoes($k);
         return $_cache{$k};
     }
@@ -255,9 +265,9 @@ Results are memoized across calls.
 # Recursively build all free polyominoes of a given size.
 sub _generate_polyominoes {
     my ($size) = @_;
-    return [ [ [0, 0] ] ] if $size == 1;
+    return [ [ [ 0, 0 ] ] ] if $size == 1;
 
-    my @prev = @{ _generate_polyominoes($size - 1) };
+    my @prev = @{ _generate_polyominoes( $size - 1 ) };
     my %seen;
     my @result;
 
@@ -268,21 +278,21 @@ sub _generate_polyominoes {
         }
         my %candidates;
         for my $cell (@$poly) {
-            for my $d ([-1,0],[1,0],[0,-1],[0,1]) {
+            for my $d ( [ -1, 0 ], [ 1, 0 ], [ 0, -1 ], [ 0, 1 ] ) {
                 my $nr = $cell->[0] + $d->[0];
                 my $nc = $cell->[1] + $d->[1];
                 next if $in_poly{"$nr,$nc"};
-                $candidates{"$nr,$nc"} = [$nr, $nc];
+                $candidates{"$nr,$nc"} = [ $nr, $nc ];
             }
         }
-        for my $cand (values %candidates) {
-            my $new_poly = _canonicalize(@$poly, $cand);
+        for my $cand ( values %candidates ) {
+            my $new_poly = _canonicalize( @$poly, $cand );
             my @ori_keys;
-            for my $ori (_orientations($new_poly)) {
+            for my $ori ( _orientations($new_poly) ) {
                 push @ori_keys, _poly_key($ori);
             }
-            my $free_key = (sort @ori_keys)[0];
-            unless ($seen{$free_key}++) {
+            my $free_key = ( sort @ori_keys )[0];
+            unless ( $seen{$free_key}++ ) {
                 push @result, $new_poly;
             }
         }
@@ -294,7 +304,7 @@ sub _generate_polyominoes {
 
 sub _canonicalize {
     my @cells = @_;
-    my ($min_r, $min_c) = ($cells[0][0], $cells[0][1]);
+    my ( $min_r, $min_c ) = ( $cells[0][0], $cells[0][1] );
     for my $cell (@cells) {
         $min_r = $cell->[0] if $cell->[0] < $min_r;
         $min_c = $cell->[1] if $cell->[1] < $min_c;
@@ -313,14 +323,14 @@ sub _poly_key {
     for my $cell (@$poly) {
         push @parts, "$cell->[0]:$cell->[1]";
     }
-    return join(',', @parts);
+    return join( ',', @parts );
 }
 
 sub _apply_transform {
-    my ($poly, $t) = @_;
+    my ( $poly, $t ) = @_;
     my @transformed;
     for my $cell (@$poly) {
-        push @transformed, $t->($cell->[0], $cell->[1]);
+        push @transformed, $t->( $cell->[0], $cell->[1] );
     }
     return _canonicalize(@transformed);
 }
@@ -328,21 +338,21 @@ sub _apply_transform {
 sub _orientations {
     my ($poly) = @_;
     my @transforms = (
-        sub { [ $_[0],  $_[1]] },
-        sub { [-$_[1],  $_[0]] },
-        sub { [-$_[0], -$_[1]] },
-        sub { [ $_[1], -$_[0]] },
-        sub { [-$_[0],  $_[1]] },
-        sub { [ $_[1],  $_[0]] },
-        sub { [ $_[0], -$_[1]] },
-        sub { [-$_[1], -$_[0]] },
+        sub { [ $_[0],  $_[1] ] },
+        sub { [ -$_[1], $_[0] ] },
+        sub { [ -$_[0], -$_[1] ] },
+        sub { [ $_[1],  -$_[0] ] },
+        sub { [ -$_[0], $_[1] ] },
+        sub { [ $_[1],  $_[0] ] },
+        sub { [ $_[0],  -$_[1] ] },
+        sub { [ -$_[1], -$_[0] ] },
     );
     my %seen;
     my @results;
     for my $t (@transforms) {
-        my $canon = _apply_transform($poly, $t);
+        my $canon = _apply_transform( $poly, $t );
         my $key   = _poly_key($canon);
-        unless ($seen{$key}++) {
+        unless ( $seen{$key}++ ) {
             push @results, $canon;
         }
     }
@@ -355,7 +365,7 @@ sub _orientations {
 # We enumerate placements for every distinct piece size in the multiset.
 # Only one entry per distinct size is needed — DLX will pick the right count.
 sub _all_placements {
-    my ($self, %opts) = @_;
+    my ( $self, %opts ) = @_;
     my $n = $self->{n};
     my $m = $self->{m};
 
@@ -364,19 +374,20 @@ sub _all_placements {
     $needed_sizes{$_}++ for @{ $self->{pieces} };
 
     my @placements;
-    for my $k (keys %needed_sizes) {
-        for my $poly (@{ $self->free_polyominoes_of($k) }) {
-            for my $ori (_orientations($poly)) {
-                my ($max_r, $max_c) = (0, 0);
+    for my $k ( keys %needed_sizes ) {
+        for my $poly ( @{ $self->free_polyominoes_of($k) } ) {
+            for my $ori ( _orientations($poly) ) {
+                my ( $max_r, $max_c ) = ( 0, 0 );
                 for my $cell (@$ori) {
                     $max_r = $cell->[0] if $cell->[0] > $max_r;
                     $max_c = $cell->[1] if $cell->[1] > $max_c;
                 }
-                for my $dr (0 .. $n - 1 - $max_r) {
-                    for my $dc (0 .. $m - 1 - $max_c) {
+                for my $dr ( 0 .. $n - 1 - $max_r ) {
+                    for my $dc ( 0 .. $m - 1 - $max_c ) {
                         my @placed;
                         for my $cell (@$ori) {
-                            push @placed, [ $cell->[0] + $dr, $cell->[1] + $dc ];
+                            push @placed,
+                              [ $cell->[0] + $dr, $cell->[1] + $dc ];
                         }
                         push @placements, { size => $k, cells => \@placed };
                     }
@@ -398,7 +409,7 @@ sub _all_placements {
 # Finally we deduplicate: two solutions that partition the grid identically
 # (same set of cell-groups, regardless of piece ordering) are the same tiling.
 sub _run_dlx {
-    my ($self, $placements) = @_;
+    my ( $self, $placements ) = @_;
     my $n = $self->{n};
     my $m = $self->{m};
 
@@ -409,21 +420,21 @@ sub _run_dlx {
     my $dlx = Algorithm::DLX->new();
 
     my %cell_col;
-    for my $r (0 .. $n-1) {
-        for my $c (0 .. $m-1) {
+    for my $r ( 0 .. $n - 1 ) {
+        for my $c ( 0 .. $m - 1 ) {
             $cell_col{"$r,$c"} = $dlx->add_column("$r,$c");
         }
     }
 
-    for my $id (0 .. $#$placements) {
+    for my $id ( 0 .. $#$placements ) {
         my @cols;
-        for my $cell (@{ $placements->[$id]{cells} }) {
+        for my $cell ( @{ $placements->[$id]{cells} } ) {
             push @cols, $cell_col{"$cell->[0],$cell->[1]"};
         }
-        $dlx->add_row("r$id", @cols);
+        $dlx->add_row( "r$id", @cols );
     }
 
-    my $raw_solutions = $dlx->solve();
+    my $raw_solutions = $dlx->solve( number_of_solutions => 100_000, );
 
     # Decode, validate multiset, deduplicate
     my %seen;
@@ -433,7 +444,7 @@ sub _run_dlx {
         my @pieces;
         my %got;
         for my $label (@$raw_sol) {
-            (my $id = $label) =~ s/^r//;
+            ( my $id = $label ) =~ s/^r//;
             my $p = $placements->[$id];
             $got{ $p->{size} }++;
             push @pieces, $p->{cells};
@@ -441,22 +452,26 @@ sub _run_dlx {
 
         # Check size multiset matches requested
         my $match = 1;
-        for my $k (keys %required) {
-            $match = 0, last if ($got{$k} // 0) != $required{$k};
+        for my $k ( keys %required ) {
+            $match = 0, last if ( $got{$k} // 0 ) != $required{$k};
         }
         next unless $match;
 
         # Deduplicate: canonical key = sorted list of sorted cell-lists
-        my $key = join('|', sort map {
-            my @sorted_cells = sort { $a->[0] <=> $b->[0] || $a->[1] <=> $b->[1] } @$_;
-            join(',', map { "$_->[0]:$_->[1]" } @sorted_cells)
-        } @pieces);
+        my $key = join(
+            '|',
+            sort map {
+                my @sorted_cells =
+                  sort { $a->[0] <=> $b->[0] || $a->[1] <=> $b->[1] } @$_;
+                join( ',', map { "$_->[0]:$_->[1]" } @sorted_cells )
+            } @pieces
+        );
         next if $seen{$key}++;
 
         # Return pieces sorted by top-left cell for stable output
-        my @sorted_pieces = sort {
-            $a->[0][0] <=> $b->[0][0] || $a->[0][1] <=> $b->[0][1]
-        } @pieces;
+        my @sorted_pieces =
+          sort { $a->[0][0] <=> $b->[0][0] || $a->[0][1] <=> $b->[0][1] }
+          @pieces;
         push @solutions, \@sorted_pieces;
     }
 

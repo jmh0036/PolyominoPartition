@@ -33,45 +33,62 @@ polyomino_partition - Partition an N×M grid into polyominoes
 
 =cut
 
-my ($random, $size, $pieces_str, $must_str, $fill, $count) =
-    (0, undef, undef, undef, undef, undef);
+my ( $random, $size, $pieces_str, $must_str, $fill, $count ) =
+  ( 0, undef, undef, undef, undef, undef );
 
 my @remaining_args;
 my @argv = @ARGV;
 while (@argv) {
     my $arg = shift @argv;
-    if    ($arg eq '--random')  { $random = 1 }
-    elsif ($arg eq '--size')    { $size       = shift @argv }
-    elsif ($arg eq '--pieces')  { $pieces_str = shift @argv }
-    elsif ($arg eq '--must')    { $must_str   = shift @argv }
-    elsif ($arg eq '--fill')    { $fill       = shift @argv }
-    elsif ($arg eq '--count')   { $count      = shift @argv }
-    else                        { push @remaining_args, $arg }
+    if    ( $arg eq '--random' ) { $random     = 1 }
+    elsif ( $arg eq '--size' )   { $size       = shift @argv }
+    elsif ( $arg eq '--pieces' ) { $pieces_str = shift @argv }
+    elsif ( $arg eq '--must' )   { $must_str   = shift @argv }
+    elsif ( $arg eq '--fill' )   { $fill       = shift @argv }
+    elsif ( $arg eq '--count' )  { $count      = shift @argv }
+    else                         { push @remaining_args, $arg }
 }
 
-die "Usage: $0 [--random] [--count N] [--size K | --pieces S1,S2,... | --must S1,S2 --fill K] <n> [<m>]\n"
-    unless @remaining_args >= 1;
+die
+"Usage: $0 [--random] [--count N] [--size K | --pieces S1,S2,... | --must S1,S2 --fill K] <n> [<m>]\n"
+  unless @remaining_args >= 1;
 
-my ($n, $m) = @remaining_args;
+my ( $n, $m ) = @remaining_args;
 $m //= $n;
 
 # Build the tiler
 my $tiler;
-if (defined $must_str || defined $fill) {
-    die "--must and --fill must be used together\n" unless defined $must_str && defined $fill;
+if ( defined $must_str || defined $fill ) {
+    die "--must and --fill must be used together\n"
+      unless defined $must_str && defined $fill;
     my @must   = split /,/, $must_str;
     my $pieces = Polyomino::Tiler->suggest_pieces(
-        n => $n, m => $m, must => \@must, fill => $fill,
+        n    => $n,
+        m    => $m,
+        must => \@must,
+        fill => $fill,
     );
-    print "Using pieces: [" . join(', ', @$pieces) . "]\n\n";
-    $tiler = Polyomino::Tiler->new(n => $n, m => $m, pieces => $pieces);
+    print "Using pieces: [" . join( ', ', @$pieces ) . "]\n\n";
+    $tiler = Polyomino::Tiler->new(
+        n => $n,
+        m => $m,
+        pieces => $pieces,
+    );
 }
-elsif (defined $pieces_str) {
+elsif ( defined $pieces_str ) {
     my @pieces = split /,/, $pieces_str;
-    $tiler = Polyomino::Tiler->new(n => $n, m => $m, pieces => \@pieces);
+    $tiler = Polyomino::Tiler->new(
+        n => $n,
+        m => $m,
+        pieces => \@pieces,
+    );
 }
-elsif (defined $size) {
-    $tiler = Polyomino::Tiler->new(n => $n, m => $m, k => $size);
+elsif ( defined $size ) {
+    $tiler = Polyomino::Tiler->new(
+        n => $n,
+        m => $m,
+        k => $size,
+    );
 }
 else {
     die "One of --size, --pieces, or --must/--fill is required.\n";
@@ -80,43 +97,45 @@ else {
 my @pieces = @{ $tiler->pieces };
 my %size_count;
 $size_count{$_}++ for @pieces;
-my $piece_summary = join(', ',
+my $piece_summary = join( ', ',
     map { "$size_count{$_}x ${_}-omino" }
-    sort { $a <=> $b } keys %size_count);
-my $min_k = (sort { $a <=> $b } keys %size_count)[0];
+    sort { $a <=> $b } keys %size_count );
+my $min_k = ( sort { $a <=> $b } keys %size_count )[0];
 
 printf "Grid : %dx%d   Pieces : %s\n", $n, $m, $piece_summary;
 
 if ($random) {
     print "Mode : random (one solution)\n\n";
     my $solution = $tiler->solve_random();
-    if ($solution) {
-        print "Solution:\n";
-        print Polyomino::Renderer::render($solution, $n, $m);
+    while ( !$solution ) {
+        $solution = $tiler->solve_random();
     }
-    else {
-        print "No solution found.\n";
-    }
+
+    print "Solution:\n";
+    print Polyomino::Renderer::render( $solution, $n, $m );
 }
-elsif (defined $count) {
+elsif ( defined $count ) {
     printf "Mode : first %d solution(s)\n\n", $count;
     my @solutions = $tiler->solve_n($count);
-    my $nsol = scalar @solutions;
-    printf "Found %d solution%s.\n\n", $nsol, ($nsol == 1 ? '' : 's');
-    print Polyomino::Renderer::render_all(\@solutions, $n, $m);
+    my $nsol      = scalar @solutions;
+    printf "Found %d solution%s.\n\n", $nsol, ( $nsol == 1 ? '' : 's' );
+    print Polyomino::Renderer::render_all( \@solutions, $n, $m );
 }
 else {
     print "Mode : all solutions\n";
+
     # Warn if the grid is large enough that this might not terminate soon
-    if ($n * $m > 36 && $min_k <= 4) {
-        warn "Warning: finding all solutions for a " . ($n*$m) . "-cell grid with pieces of size $min_k\n"
-           . "may take a very long time. Consider --random or --count N instead.\n\n";
+    if ( $n * $m > 36 && $min_k <= 4 ) {
+        warn "Warning: finding all solutions for a "
+          . ( $n * $m )
+          . "-cell grid with pieces of size $min_k\n"
+          . "may take a very long time. Consider --random or --count N instead.\n\n";
     }
     print "\n";
     my @solutions = $tiler->solve();
-    my $nsol = scalar @solutions;
-    printf "Found %d solution%s.\n\n", $nsol, ($nsol == 1 ? '' : 's');
-    print Polyomino::Renderer::render_all(\@solutions, $n, $m);
+    my $nsol      = scalar @solutions;
+    printf "Found %d solution%s.\n\n", $nsol, ( $nsol == 1 ? '' : 's' );
+    print Polyomino::Renderer::render_all( \@solutions, $n, $m );
 }
 
 print "Done.\n";
