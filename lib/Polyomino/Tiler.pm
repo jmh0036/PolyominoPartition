@@ -482,7 +482,7 @@ sub _run_dlx {
 
 =head1 AUTHOR
 
-Your name here
+James Hammer <DERHAMMER>
 
 =head1 LICENSE
 
