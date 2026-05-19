@@ -12,6 +12,7 @@ cover_db/
 
 # Devel::NYTProf
 nytprof.out
+nytprof/
 
 # Dist::Zilla
 /.build/
