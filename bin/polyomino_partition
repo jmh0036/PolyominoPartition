@@ -26,10 +26,13 @@ polyomino_partition - Partition an N×M grid into polyominoes
                 Tile including at least one 3-omino and one 5-omino,
                 filling the remainder with 4-ominoes
 
-    --random    Return one random solution (fast for any grid size)
+    --random    Return one random solution (default); use --count to get more
 
-    --count N   Return up to N solutions (still uses full DLX search;
-                use --random for large grids)
+    --count N   Return up to N solutions
+                  With --random: shuffles placements, stops after N solutions
+                  Without --random: deterministic DLX order, stops after N
+                  Omit both flags to get all solutions (may be slow for large
+                  grids with small pieces)
 
 =cut
 
@@ -104,25 +107,32 @@ my $min_k = ( sort { $a <=> $b } keys %size_count )[0];
 
 printf "Grid : %dx%d   Pieces : %s\n", $n, $m, $piece_summary;
 
-if ($random) {
-    print "Mode : random (one solution)\n\n";
-    my $solution = $tiler->solve_random();
-    while ( !$solution ) {
-        $solution = $tiler->solve_random();
-    }
+# Resolve the effective limit and mode description.
+#
+#   --random             → shuffle placements, find 1 solution
+#   --random --count N   → shuffle placements, find up to N solutions
+#   --count N            → deterministic order, find up to N solutions
+#   (neither)            → deterministic order, find ALL solutions
+#
+my ( $limit, $shuffle, $mode_label );
 
-    print "Solution:\n";
-    print Polyomino::Renderer::render( $solution, $n, $m );
+if ($random) {
+    $limit      = $count // 1;
+    $shuffle    = 1;
+    $mode_label =
+      $limit == 1
+      ? "random (1 solution)"
+      : "random (up to $limit solutions)";
 }
 elsif ( defined $count ) {
-    printf "Mode : first %d solution(s)\n\n", $count;
-    my @solutions = $tiler->solve_n($count);
-    my $nsol      = scalar @solutions;
-    printf "Found %d solution%s.\n\n", $nsol, ( $nsol == 1 ? '' : 's' );
-    print Polyomino::Renderer::render_all( \@solutions, $n, $m );
+    $limit      = $count;
+    $shuffle    = 0;
+    $mode_label = "first $limit solution(s)";
 }
 else {
-    print "Mode : all solutions\n";
+    $limit      = undef;    # no limit → all solutions
+    $shuffle    = 0;
+    $mode_label = "all solutions";
 
     # Warn if the grid is large enough that this might not terminate soon
     if ( $n * $m > 36 && $min_k <= 4 ) {
@@ -131,11 +141,35 @@ else {
           . "-cell grid with pieces of size $min_k\n"
           . "may take a very long time. Consider --random or --count N instead.\n\n";
     }
-    print "\n";
-    my @solutions = $tiler->solve();
-    my $nsol      = scalar @solutions;
-    printf "Found %d solution%s.\n\n", $nsol, ( $nsol == 1 ? '' : 's' );
-    print Polyomino::Renderer::render_all( \@solutions, $n, $m );
 }
+
+print "Mode : $mode_label\n\n";
+
+my @solutions;
+if ($shuffle) {
+    # solve_random shuffles placements before each attempt, so retrying gives
+    # different DLX traversal orders. Retries are needed for mixed-piece problems
+    # where the piece-size multiset filter may discard the one DLX result that
+    # number_of_solutions => $limit caps the search at.
+    my $max_attempts = 200;
+    for my $attempt ( 1 .. $max_attempts ) {
+        @solutions = $tiler->solve_random($limit);
+        last if @solutions;
+    }
+    if ( !@solutions ) {
+        die "Could not find a valid random solution after $max_attempts attempts.\n"
+          . "The piece set may have very few solutions, or none at all.\n";
+    }
+}
+elsif ( defined $limit ) {
+    @solutions = $tiler->solve($limit);
+}
+else {
+    @solutions = $tiler->solve();
+}
+
+my $nsol = scalar @solutions;
+printf "Found %d solution%s.\n\n", $nsol, ( $nsol == 1 ? '' : 's' );
+print Polyomino::Renderer::render_all( \@solutions, $n, $m );
 
 print "Done.\n";

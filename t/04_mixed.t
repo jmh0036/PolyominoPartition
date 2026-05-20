@@ -2,9 +2,10 @@ use strict;
 use warnings;
 use Test::More;
 use FindBin qw($Bin);
-use lib "$Bin/../lib";
+use lib "$Bin/../lib", "$Bin";
 
 use Polyomino::Tiler;
+use TestHelper qw(validate_solution);
 
 # ── suggest_pieces ────────────────────────────────────────────────────────
 {
@@ -45,46 +46,13 @@ use Polyomino::Tiler;
     like( $@, qr/exceed/, 'suggest_pieces: dies when must pieces exceed area' );
 }
 
-# ── Validation helper ─────────────────────────────────────────────────────
-sub validate_mixed {
-    my ( $solution, $n, $m, $pieces_spec ) = @_;
-    my %expected;
-    $expected{$_}++ for @$pieces_spec;
-
-    my %coverage;
-    my %got_sizes;
-    for my $piece (@$solution) {
-        my $sz = scalar @$piece;
-        $got_sizes{$sz}++;
-        for my $cell (@$piece) {
-            my $key = "$cell->[0],$cell->[1]";
-            return ( 0, "cell $key covered twice" ) if $coverage{$key}++;
-            return ( 0, "cell $key out of bounds" )
-              if $cell->[0] < 0
-              || $cell->[0] >= $n
-              || $cell->[1] < 0
-              || $cell->[1] >= $m;
-        }
-    }
-    return ( 0, "not all cells covered" )
-      unless scalar keys %coverage == $n * $m;
-    for my $k ( keys %expected ) {
-        return ( 0,
-                "wrong count of size-$k: got "
-              . ( $got_sizes{$k} // 0 )
-              . " want $expected{$k}" )
-          unless ( $got_sizes{$k} // 0 ) == $expected{$k};
-    }
-    return ( 1, "ok" );
-}
-
 # ── Mixed piece tiling ────────────────────────────────────────────────────
 {
     my $tiler = Polyomino::Tiler->new( n => 2, m => 3, pieces => [ 3, 3 ] );
     my @sol   = $tiler->solve();
     ok( @sol > 0, '2x3 [3,3]: has solutions' );
     for my $s (@sol) {
-        my ( $ok, $reason ) = validate_mixed( $s, 2, 3, [ 3, 3 ] );
+        my ( $ok, $reason ) = validate_solution( $s, 2, 3, [ 3, 3 ] );
         ok( $ok, "2x3 [3,3]: solution valid ($reason)" );
     }
 }
@@ -94,7 +62,7 @@ sub validate_mixed {
     my @sol   = $tiler->solve();
     ok( @sol > 0, '2x3 [2,4]: has solutions' );
     for my $s (@sol) {
-        my ( $ok, $reason ) = validate_mixed( $s, 2, 3, [ 2, 4 ] );
+        my ( $ok, $reason ) = validate_solution( $s, 2, 3, [ 2, 4 ] );
         ok( $ok, "2x3 [2,4]: solution valid ($reason)" );
     }
 }
@@ -114,7 +82,7 @@ sub validate_mixed {
     my $tiler = Polyomino::Tiler->new( n => 3, m => 3, pieces => [ 4, 5 ] );
     my @sol   = $tiler->solve();
     for my $s (@sol) {
-        my ( $ok, $reason ) = validate_mixed( $s, 3, 3, [ 4, 5 ] );
+        my ( $ok, $reason ) = validate_solution( $s, 3, 3, [ 4, 5 ] );
         ok( $ok, "3x3 [4,5]: solution valid ($reason)" );
     }
     pass("3x3 [4,5]: solver ran without error");
@@ -122,9 +90,9 @@ sub validate_mixed {
 
 {
     my $tiler = Polyomino::Tiler->new( n => 2, m => 3, pieces => [ 3, 3 ] );
-    my $sol   = $tiler->solve_random();
-    ok( defined $sol, 'solve_random with mixed pieces returns a solution' );
-    my ( $ok, $reason ) = validate_mixed( $sol, 2, 3, [ 3, 3 ] );
+    my @sols  = $tiler->solve_random();
+    ok( @sols, 'solve_random with mixed pieces returns a solution' );
+    my ( $ok, $reason ) = validate_solution( $sols[0], 2, 3, [ 3, 3 ] );
     ok( $ok, "solve_random mixed solution valid ($reason)" );
 }
 
@@ -134,7 +102,7 @@ sub validate_mixed {
     my @sol   = $tiler->solve();
     ok( @sol > 0, '3x4/k=3: has solutions' );
     for my $s (@sol) {
-        my ( $ok, $reason ) = validate_mixed( $s, 3, 4, $tiler->pieces );
+        my ( $ok, $reason ) = validate_solution( $s, 3, 4, $tiler->pieces );
         ok( $ok, "3x4/k=3: solution valid ($reason)" );
     }
 }

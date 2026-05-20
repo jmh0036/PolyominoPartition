@@ -5,8 +5,8 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME             => 'Polyomino::Tiler',
     AUTHOR           => 'james.hammer3@gmail.com',
-    VERSION          => '0.01',
-    ABSTRACT         => 'Partition an NxM grid into k-ominoes using Dancing Links',
+    VERSION          => '0.03',
+    ABSTRACT         => 'Partition an NxM grid into polyominoes using Dancing Links',
     LICENSE          => 'perl',
     MIN_PERL_VERSION => '5.010',
     EXE_FILES        => ['bin/polyomino_partition'],

@@ -5,7 +5,7 @@ use warnings;
 use List::Util qw(shuffle);
 use Algorithm::DLX;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 =head1 NAME
 
@@ -31,8 +31,10 @@ Polyomino::Tiler - Partition an N×M grid into polyominoes using Dancing Links
         fill => 4,        # pad remainder with 4-ominoes if possible
     );
 
-    my @solutions = $tiler->solve();         # all solutions
-    my $solution  = $tiler->solve_random();  # one random solution
+    my @solutions = $tiler->solve();          # all solutions
+    my @solutions = $tiler->solve(10);        # up to 10 solutions (stops early)
+    my @solutions = $tiler->solve_random();   # one random solution
+    my @solutions = $tiler->solve_random(5);  # up to 5 random solutions
 
 =head1 DESCRIPTION
 
@@ -192,55 +194,55 @@ sub pieces { $_[0]->{pieces} }
 
 # ── Public solve methods ───────────────────────────────────────────────────
 
-=head2 solve()
+=head2 solve( [$limit] )
 
-Return all distinct tilings as a list of solutions. Each solution is an
+Return distinct tilings as a list of solutions. Each solution is an
 arrayref of pieces; each piece is an arrayref of C<[$row, $col]> pairs.
 
+With no argument, returns all solutions. With a positive integer C<$limit>,
+DLX stops as soon as it has found C<$limit> solutions — genuinely faster
+than finding everything when the total count is much larger than C<$limit>.
+
 B<Warning>: the number of tilings grows extremely fast with grid size and
-small piece sizes. This method is practical for small grids (roughly up to
-6×6 with triominoes, or grids where you expect at most a few thousand
-solutions). For larger grids use C<solve_random()> or C<solve_n()>.
+small piece sizes. Without a limit this is practical only for small grids
+(roughly up to 6×6 with triominoes, or where you expect at most a few
+thousand solutions). For large grids use C<solve_random()> or pass a limit.
 
 =cut
 
 sub solve {
-    my ($self) = @_;
+    my ( $self, $limit ) = @_;
+    if ( defined $limit ) {
+        die "solve limit must be a positive integer\n"
+          unless $limit =~ /^\d+$/ && $limit >= 1;
+    }
     my $placements = $self->_all_placements();
-    return $self->_run_dlx($placements);
+    return $self->_run_dlx( $placements, $limit );
 }
 
-=head2 solve_n($n)
+=head2 solve_random( [$count] )
 
-Return up to C<$n> distinct tilings. DLX still searches exhaustively
-internally, so this is only a speedup when the total number of solutions
-is not vastly larger than C<$n>. For large grids, prefer C<solve_random()>.
+Shuffle the placement candidates and return up to C<$count> tilings (default
+1). Because DLX stops as soon as it has enough solutions, this is fast even
+for large grids. Always returns a (possibly empty) list.
 
-=cut
-
-sub solve_n {
-    my ( $self, $n ) = @_;
-    die "solve_n requires a positive integer\n"
-      unless defined $n && $n =~ /^\d+$/ && $n >= 1;
-    my $placements = $self->_all_placements();
-    my @all        = $self->_run_dlx($placements);
-    return @all > $n ? @all[ 0 .. $n - 1 ] : @all;
-}
-
-=head2 solve_random()
-
-Return one random tiling (arrayref of pieces), or C<undef> if none exists.
-Shuffles the placement candidates before solving so DLX finds a different
-first solution on each call. This is fast even for large grids since DLX
-stops as soon as it finds one solution.
+For mixed-piece problems the DLX result is filtered by piece-size multiset
+after solving. In the rare case that none of the returned raw solutions pass
+that filter (which can happen when C<number_of_solutions> caps the search
+before a valid multiset arrangement is found), the caller should retry.
+C<solve_random> itself does not retry so that callers retain control over
+timeout and attempt budgets.
 
 =cut
 
 sub solve_random {
-    my ($self)     = @_;
+    my ( $self, $count ) = @_;
+    $count //= 1;
+    die "solve_random count must be a positive integer\n"
+      unless $count =~ /^\d+$/ && $count >= 1;
+
     my $placements = $self->_all_placements( shuffle => 1 );
-    my @solutions  = $self->_run_dlx($placements);
-    return @solutions ? $solutions[0] : undef;
+    return $self->_run_dlx( $placements, $count );
 }
 
 # ── Polyomino generation ───────────────────────────────────────────────────
@@ -408,8 +410,12 @@ sub _all_placements {
 # discarding solutions that don't match (e.g. wrong counts of each size).
 # Finally we deduplicate: two solutions that partition the grid identically
 # (same set of cell-groups, regardless of piece ordering) are the same tiling.
+#
+# $limit: maximum number of solutions to return, or undef for all.
+# DLX is told to stop at $limit (when defined), so this is a true early exit,
+# not a post-hoc slice.
 sub _run_dlx {
-    my ( $self, $placements ) = @_;
+    my ( $self, $placements, $limit ) = @_;
     my $n = $self->{n};
     my $m = $self->{m};
 
@@ -434,7 +440,12 @@ sub _run_dlx {
         $dlx->add_row( "r$id", @cols );
     }
 
-    my $raw_solutions = $dlx->solve( number_of_solutions => 1, );
+    # When $limit is defined, tell DLX to stop early. For the unlimited case
+    # we omit the parameter entirely so DLX uses its own default (all).
+    my $raw_solutions =
+      defined $limit
+      ? $dlx->solve( number_of_solutions => $limit )
+      : $dlx->solve();
 
     # Decode, validate multiset, deduplicate
     my %seen;
@@ -473,6 +484,10 @@ sub _run_dlx {
           sort { $a->[0][0] <=> $b->[0][0] || $a->[0][1] <=> $b->[0][1] }
           @pieces;
         push @solutions, \@sorted_pieces;
+
+        # Stop once we have enough (guards against DLX returning more than
+        # $limit after deduplication expands or collapses the raw count)
+        last if defined $limit && @solutions >= $limit;
     }
 
     return @solutions;

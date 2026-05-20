@@ -2,9 +2,10 @@ use strict;
 use warnings;
 use Test::More;
 use FindBin qw($Bin);
-use lib "$Bin/../lib";
+use lib "$Bin/../lib", "$Bin";
 
 use Polyomino::Tiler;
+use TestHelper qw(validate_solution);
 
 # ── Solution count spot-checks ─────────────────────────────────────────────
 {
@@ -39,43 +40,6 @@ use Polyomino::Tiler;
 }
 
 # ── Solution validity ──────────────────────────────────────────────────────
-# Check: every cell covered exactly once, every piece has the right size,
-# the multiset of piece sizes matches what was requested.
-sub validate_solution {
-    my ( $solution, $n, $m, $pieces_spec ) = @_;
-
-    # Build expected size multiset
-    my %expected;
-    $expected{$_}++ for @$pieces_spec;
-
-    my %coverage;
-    my %got_sizes;
-    for my $piece (@$solution) {
-        my $sz = scalar @$piece;
-        $got_sizes{$sz}++;
-        for my $cell (@$piece) {
-            my $key = "$cell->[0],$cell->[1]";
-            return ( 0, "cell $key covered twice" ) if $coverage{$key}++;
-            return ( 0, "cell $key out of bounds" )
-              if $cell->[0] < 0
-              || $cell->[0] >= $n
-              || $cell->[1] < 0
-              || $cell->[1] >= $m;
-        }
-    }
-    return ( 0, "not all cells covered" )
-      unless scalar keys %coverage == $n * $m;
-
-    for my $k ( keys %expected ) {
-        return ( 0,
-                "wrong count of size-$k pieces: got "
-              . ( $got_sizes{$k} // 0 )
-              . " want $expected{$k}" )
-          unless ( $got_sizes{$k} // 0 ) == $expected{$k};
-    }
-    return ( 1, "ok" );
-}
-
 for my $spec ( [ 2, 2, 2 ], [ 3, 3, 3 ], [ 4, 4, 2 ], [ 2, 4, 2 ] ) {
     my ( $n, $m, $k ) = @$spec;
     my $tiler     = Polyomino::Tiler->new( n => $n, m => $m, k => $k );
@@ -91,11 +55,31 @@ for my $spec ( [ 2, 2, 2 ], [ 3, 3, 3 ], [ 4, 4, 2 ], [ 2, 4, 2 ] ) {
 
 # ── solve_random ──────────────────────────────────────────────────────────
 {
+    my $tiler  = Polyomino::Tiler->new( n => 4, m => 4, k => 2 );
+    my @sols   = $tiler->solve_random();
+    is( scalar @sols, 1, 'solve_random() returns exactly 1 solution for 4x4/k=2' );
+    my ( $ok, $reason ) = validate_solution( $sols[0], 4, 4, $tiler->pieces );
+    ok( $ok, "solve_random() solution is valid ($reason)" );
+}
+
+# solve_random with an explicit count
+{
     my $tiler = Polyomino::Tiler->new( n => 4, m => 4, k => 2 );
-    my $sol   = $tiler->solve_random();
-    ok( defined $sol, 'solve_random returns a solution for 4x4/k=2' );
-    my ( $ok, $reason ) = validate_solution( $sol, 4, 4, $tiler->pieces );
-    ok( $ok, "solve_random solution is valid ($reason)" );
+    my @sols  = $tiler->solve_random(5);
+    ok( scalar @sols >= 1 && scalar @sols <= 5,
+        'solve_random(5): returns 1–5 solutions' );
+    for my $sol (@sols) {
+        my ( $ok, $reason ) = validate_solution( $sol, 4, 4, $tiler->pieces );
+        ok( $ok, "solve_random(5): solution valid ($reason)" );
+    }
+}
+
+{
+    # 1x1/k=1 has exactly 1 solution; solve_random() should always find it
+    my $tiler = Polyomino::Tiler->new( n => 1, m => 1, k => 1 );
+    my @sols  = $tiler->solve_random();
+    is( scalar @sols, 1,
+        'solve_random() on single-solution problem returns it' );
 }
 
 # ── No duplicate solutions ────────────────────────────────────────────────
@@ -118,21 +102,32 @@ for my $spec ( [ 2, 2, 2 ], [ 3, 3, 3 ], [ 4, 4, 2 ], [ 2, 4, 2 ] ) {
     is( $dupes, 0, '2x2/k=2: no duplicate solutions' );
 }
 
-# ── solve_n ───────────────────────────────────────────────────────────────
+# ── solve with a limit ────────────────────────────────────────────────────
 {
     my $tiler = Polyomino::Tiler->new( n => 4, m => 4, k => 2 );
-    my @sol   = $tiler->solve_n(5);
-    ok( scalar @sol <= 5, 'solve_n(5): returns at most 5 solutions' );
-    ok( scalar @sol > 0,  'solve_n(5): returns at least 1 solution' );
+    my @sol   = $tiler->solve(5);
+    ok( scalar @sol <= 5, 'solve(5): returns at most 5 solutions' );
+    ok( scalar @sol > 0,  'solve(5): returns at least 1 solution' );
     my ( $ok, $reason ) = validate_solution( $sol[0], 4, 4, $tiler->pieces );
-    ok( $ok, "solve_n(5): first solution is valid ($reason)" );
+    ok( $ok, "solve(5): first solution is valid ($reason)" );
 }
 
 {
-    # When total solutions < n, returns all of them
+    # When total solutions < limit, returns all of them
     my $tiler = Polyomino::Tiler->new( n => 2, m => 2, k => 2 );
-    my @sol   = $tiler->solve_n(100);
-    is( scalar @sol, 2, 'solve_n(100) on 2x2/k=2: returns all 2 solutions' );
+    my @sol   = $tiler->solve(100);
+    is( scalar @sol, 2, 'solve(100) on 2x2/k=2: returns all 2 solutions' );
+}
+
+# solve genuinely stops early: DLX must not explore beyond the limit.
+# We verify this indirectly — solve(1) on a problem with 36 solutions must
+# return exactly 1 result, not 36 filtered down to 1.
+{
+    my $tiler = Polyomino::Tiler->new( n => 4, m => 4, k => 2 );
+    my @sol   = $tiler->solve(1);
+    is( scalar @sol, 1, 'solve(1): returns exactly 1 solution (early stop)' );
+    my ( $ok, $reason ) = validate_solution( $sol[0], 4, 4, $tiler->pieces );
+    ok( $ok, "solve(1): solution is valid ($reason)" );
 }
 
 done_testing();
