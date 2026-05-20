@@ -434,7 +434,7 @@ sub _run_dlx {
         $dlx->add_row( "r$id", @cols );
     }
 
-    my $raw_solutions = $dlx->solve( number_of_solutions => 100_000, );
+    my $raw_solutions = $dlx->solve( number_of_solutions => 1, );
 
     # Decode, validate multiset, deduplicate
     my %seen;
